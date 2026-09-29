@@ -52,8 +52,9 @@ import {
   parseTimeLocalToMinutes,
   minutesToTimeLocal,
 } from "./timetable-model";
-import { formatDateTimeForDisplay } from "./date-format";
+import { formatDateTime24ForDisplay } from "./date-format";
 import { orderedZoneIds } from "./zone-order";
+import { renderTime24Picker } from "./time24";
 import type { HomeAssistant } from "./types";
 
 interface KindOption {
@@ -179,10 +180,6 @@ export class CycleWizard extends LitElement {
         display: flex;
         align-items: center;
         gap: 8px;
-      }
-      .time-fields input[type="time"] {
-        width: auto;
-        min-width: 120px;
       }
       .zone-pick {
         display: flex;
@@ -636,15 +633,15 @@ export class CycleWizard extends LitElement {
       <div class="time-fields">
         ${this._times.map(
           (timeLocal, index) => html`<div class="time-row">
-            <input
-              type="time"
-              .value=${timeLocal}
-              @input=${(e: Event) => {
+            ${renderTime24Picker(
+              `${t(this.hass, "config_panel.cycle_time_title")} ${index + 1}`,
+              timeLocal,
+              (value) => {
                 const next = [...this._times];
-                next[index] = (e.target as HTMLInputElement).value || "06:00";
+                next[index] = value;
                 this._times = next;
-              }}
-            />
+              }
+            )}
             ${index > 0
               ? html`<button
                   type="button"
@@ -701,7 +698,15 @@ export class CycleWizard extends LitElement {
       ${first
         ? html`<p class="preview-line">
             ${t(this.hass, "config_panel.cycle_preview_first_run", {
-              when: formatDateTimeForDisplay(this.hass, new Date(first.getFullYear(), first.getMonth(), first.getDate(), ...this._times[0].split(":").map(Number) as [number, number])),
+              when: formatDateTime24ForDisplay(
+                this.hass,
+                new Date(
+                  first.getFullYear(),
+                  first.getMonth(),
+                  first.getDate(),
+                  ...this._times[0].split(":").map(Number) as [number, number]
+                )
+              ),
             })}
           </p>`
         : nothing}
@@ -928,7 +933,7 @@ export class CycleWizard extends LitElement {
         ${first
           ? html`<p class="preview-line" style="margin-bottom:0">
               ${t(this.hass, "config_panel.cycle_preview_first_run", {
-                when: formatDateTimeForDisplay(
+                when: formatDateTime24ForDisplay(
                   this.hass,
                   new Date(
                     first.getFullYear(),
