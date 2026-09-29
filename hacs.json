@@ -1,7 +1,6 @@
 {
   "name": "Simple Irrigation",
   "render_readme": true,
-  "zip_release": true,
-  "filename": "simple_irrigation.zip",
+  "zip_release": false,
   "homeassistant": "2024.1.0"
 }

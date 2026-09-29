@@ -3186,7 +3186,7 @@ function scriptOverrideForSave(value, phase) {
 function hasScriptOverride(pre, post) {
     return pre.override || post.override;
 }
-function renderScriptOverride(hass, domains, phase, value,
+function renderScriptOverride(hass, domains, phase, value, 
 /** The installation's script and timeout, shown while not overriding. */
 globalScript, globalTimeoutSec, busy, onChange) {
     const patch = (p) => onChange({ ...value, ...p });
@@ -8632,7 +8632,7 @@ __decorate([
 ], ViewZones.prototype, "_dragZoneId", void 0);
 defineCustomElementOnce("si-view-zones", ViewZones);
 
-const VERSION = "1.13.0-beta.1";
+const VERSION = "1.13.0-beta.2";
 const PANEL_PAGES = ["overview", "zones", "schedule", "timetable", "settings"];
 /** Legacy path aliases so existing links / deep links keep working. */
 const PAGE_ALIASES = {
