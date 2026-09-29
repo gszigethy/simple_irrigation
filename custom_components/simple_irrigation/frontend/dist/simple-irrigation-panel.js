@@ -1621,8 +1621,8 @@ function durationForMode(zone, mode) {
         return Math.max(0, Number(zone.duration_extra_min ?? 0));
     return Math.max(0, Number(zone.duration_normal_min ?? 0));
 }
-/** Full phase occupancy: supply warm-up + downstream watering + supply tail. */
-function executionMinutesForMode(zone, mode) {
+/** Full phase occupancy for an explicit watering duration. */
+function executionMinutes(zone, wateringMinutes) {
     if (!zone)
         return 0;
     const prerequisite = zone.prerequisite;
@@ -1630,7 +1630,7 @@ function executionMinutesForMode(zone, mode) {
         ? Math.max(0, Number(prerequisite.start_delay_sec ?? 0)) +
             Math.max(0, Number(prerequisite.stop_delay_sec ?? 0))
         : 0;
-    return durationForMode(zone, mode) + margins / 60;
+    return Math.max(0, wateringMinutes) + margins / 60;
 }
 /** Bucket by wall-clock hour of segment start ([0,8), [8,16), [16,24)). */
 /**
@@ -1762,11 +1762,7 @@ function buildTimetableEntries(installation) {
                     if (!z)
                         continue;
                     if (Boolean(z.enabled ?? true)) {
-<<<<<<< HEAD
-                        const d = executionMinutesForMode(z, mode);
-=======
-                        const d = scheduledDuration(zid, z);
->>>>>>> 58e7220 (Add schedule-specific zone durations)
+                        const d = executionMinutes(z, scheduledDuration(zid, z));
                         phaseLenMin = Math.max(phaseLenMin, d);
                     }
                 }
@@ -1775,18 +1771,13 @@ function buildTimetableEntries(installation) {
                     if (!z)
                         continue;
                     const zoneEnabled = Boolean(z.enabled ?? true);
-<<<<<<< HEAD
-                    const dur = durationForMode(z, mode);
+                    const dur = scheduledDuration(zid, z);
                     const prerequisite = z.prerequisite;
                     const startMin = phaseStart +
                         (prerequisite
                             ? Math.max(0, Number(prerequisite.start_delay_sec ?? 0)) / 60
                             : 0);
-=======
-                    const dur = scheduledDuration(zid, z);
-                    const startMin = phaseStart;
->>>>>>> 58e7220 (Add schedule-specific zone durations)
-                    const endMin = phaseStart + dur;
+                    const endMin = startMin + dur;
                     entries.push({
                         zoneId: zid,
                         weekday,
@@ -2394,16 +2385,13 @@ class ViewOverview extends i$2 {
         const preStart = Math.max(0, Number(this._inst.pre_start_delay_sec ?? 10)) / 60;
         const minutes = programMinutes(phases, cycleSoakOf(slot), (zid) => {
             const z = zones[zid];
-<<<<<<< HEAD
-            return z && Boolean(z.enabled ?? true) ? executionMinutesForMode(z, mode) : 0;
-=======
             if (!z || !Boolean(z.enabled ?? true))
                 return 0;
             const durations = (slot.zone_durations_min ?? {});
-            return mode === "schedule_specific"
+            const watering = mode === "schedule_specific"
                 ? Math.max(0, Number(durations[zid] ?? 0))
                 : durationForMode(z, mode);
->>>>>>> 58e7220 (Add schedule-specific zone durations)
+            return executionMinutes(z, watering);
         });
         return Math.round(preStart + minutes);
     }
@@ -3198,7 +3186,7 @@ function scriptOverrideForSave(value, phase) {
 function hasScriptOverride(pre, post) {
     return pre.override || post.override;
 }
-function renderScriptOverride(hass, domains, phase, value, 
+function renderScriptOverride(hass, domains, phase, value,
 /** The installation's script and timeout, shown while not overriding. */
 globalScript, globalTimeoutSec, busy, onChange) {
     const patch = (p) => onChange({ ...value, ...p });
@@ -3867,15 +3855,12 @@ class CycleWizard extends i$2 {
         const mode = this._mode();
         const minutes = programMinutes(phases, this._cycleSoak, (zid) => {
             const z = zones[zid];
-<<<<<<< HEAD
-            return z && Boolean(z.enabled ?? true) ? executionMinutesForMode(z, mode) : 0;
-=======
             if (!z || !Boolean(z.enabled ?? true))
                 return 0;
-            return mode === "schedule_specific"
+            const watering = mode === "schedule_specific"
                 ? Number(this._zoneDurations[zid] ?? 0)
                 : durationForMode(z, mode);
->>>>>>> 58e7220 (Add schedule-specific zone durations)
+            return executionMinutes(z, watering);
         });
         return Math.round(preStart + minutes);
     }
@@ -4796,13 +4781,10 @@ class ViewSchedule extends i$2 {
         const mode = this._mode();
         const minutes = programMinutes(phases, cs, (zid) => {
             const z = zones[zid];
-<<<<<<< HEAD
-            return z && Boolean(z.enabled ?? true) ? executionMinutesForMode(z, mode) : 0;
-=======
             if (!z || !Boolean(z.enabled ?? true))
                 return 0;
-            return mode === "schedule_specific" ? Number(durations[zid] ?? 0) : durationForMode(z, mode);
->>>>>>> 58e7220 (Add schedule-specific zone durations)
+            const watering = mode === "schedule_specific" ? Number(durations[zid] ?? 0) : durationForMode(z, mode);
+            return executionMinutes(z, watering);
         });
         return Math.round(preStart + minutes);
     }
@@ -8650,7 +8632,7 @@ __decorate([
 ], ViewZones.prototype, "_dragZoneId", void 0);
 defineCustomElementOnce("si-view-zones", ViewZones);
 
-const VERSION = "1.12.0";
+const VERSION = "1.13.0-beta.1";
 const PANEL_PAGES = ["overview", "zones", "schedule", "timetable", "settings"];
 /** Legacy path aliases so existing links / deep links keep working. */
 const PAGE_ALIASES = {
