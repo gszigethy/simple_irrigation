@@ -42,7 +42,12 @@ from .models import (
     normalize_weekdays,
     normalize_zone_order,
 )
-from .cycle import CYCLE_KINDS, anchor_week_parity, generate_cycle_slots
+from .cycle import (
+    CYCLE_KINDS,
+    anchor_week_parity,
+    generate_cycle_slots,
+    validate_cycle_start_times,
+)
 from .runtime import ScheduleSlotRunError, ZoneManualRunError, ZoneStopError
 from .scheduler import compute_next_runs, phases_for_slot
 from .time_util import next_slot_fire_local_any, parse_hh_mm
@@ -765,9 +770,11 @@ class SimpleIrrigationPanelSlotView(HomeAssistantView):
                 if zid in seen_z:
                     return self.json({"success": False, "error": "duplicate_zone"}, status_code=400)
                 seen_z.add(zid)
-            for tstr in meta.get("times") or []:
-                if parse_hh_mm(str(tstr).strip()) is None:
-                    return self.json({"success": False, "error": "invalid_time"}, status_code=400)
+            normalized_times, times_error = validate_cycle_start_times(meta.get("times"))
+            if times_error:
+                return self.json({"success": False, "error": times_error}, status_code=400)
+            if normalized_times:
+                meta["times"] = normalized_times
             enabled = bool(data.get("enabled", True))
             incoming_id = str(data.get("cycle_id") or "")  # set when editing an existing cycle
             anchor = int(meta.get("anchor_weekday", 0))
