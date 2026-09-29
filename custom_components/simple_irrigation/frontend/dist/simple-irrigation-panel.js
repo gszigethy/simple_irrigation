@@ -1373,6 +1373,11 @@ const MINUTES = Array.from({ length: 60 }, (_, minute) => String(minute).padStar
 /** Native time inputs follow the browser's clock preference; two selects do not. */
 function renderTime24Picker(label, timeLocal, onChange) {
     const [hour = "00", minute = "00"] = formatTime24(timeLocal).split(":");
+    // Lit applies the select's `.value` property before it inserts the dynamic
+    // option list.  A native select therefore falls back to option zero (00)
+    // on first render, even when `hour`/`minute` contain a saved schedule time.
+    // Marking the matching options selected as well makes initial rendering and
+    // later edits deterministic while retaining `.value` for normal updates.
     return b `<span class="time24-picker" role="group" aria-label=${label}>
     <select
       aria-label=${`${label} HH`}
@@ -1381,7 +1386,7 @@ function renderTime24Picker(label, timeLocal, onChange) {
         onChange(`${event.target.value}:${minute}`);
     }}
     >
-      ${HOURS.map((value) => b `<option value=${value}>${value}</option>`)}
+      ${HOURS.map((value) => b `<option value=${value} .selected=${value === hour}>${value}</option>`)}
     </select>
     <span aria-hidden="true">:</span>
     <select
@@ -1391,7 +1396,7 @@ function renderTime24Picker(label, timeLocal, onChange) {
         onChange(`${hour}:${event.target.value}`);
     }}
     >
-      ${MINUTES.map((value) => b `<option value=${value}>${value}</option>`)}
+      ${MINUTES.map((value) => b `<option value=${value} .selected=${value === minute}>${value}</option>`)}
     </select>
   </span>`;
 }
@@ -4202,6 +4207,21 @@ class CycleWizard extends i$2 {
         }}
         >
           ${t(this.hass, "config_panel.cycle_select_all")}
+        </button>
+        <button
+          type="button"
+          class="btn-outline"
+          style="margin-left:6px;margin-top:0;padding:4px 10px;font-size:0.8rem"
+          @click=${() => {
+            // Clearing the duration map together with the zone list keeps an
+            // empty selection from carrying stale per-zone runtimes back into
+            // the next save if the user selects a different set of zones.
+            this._zoneIds = [];
+            this._zoneDurations = {};
+            this.requestUpdate();
+        }}
+        >
+          ${t(this.hass, "config_panel.cycle_select_none")}
         </button>
       </div>
       ${allIds.map((id) => {
@@ -8659,7 +8679,7 @@ __decorate([
 ], ViewZones.prototype, "_dragZoneId", void 0);
 defineCustomElementOnce("si-view-zones", ViewZones);
 
-const VERSION = "1.13.0-beta.3";
+const VERSION = "1.13.0-beta.4";
 const PANEL_PAGES = ["overview", "zones", "schedule", "timetable", "settings"];
 /** Legacy path aliases so existing links / deep links keep working. */
 const PAGE_ALIASES = {

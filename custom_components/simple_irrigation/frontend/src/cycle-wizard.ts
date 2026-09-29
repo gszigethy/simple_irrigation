@@ -739,6 +739,21 @@ export class CycleWizard extends LitElement {
         >
           ${t(this.hass, "config_panel.cycle_select_all")}
         </button>
+        <button
+          type="button"
+          class="btn-outline"
+          style="margin-left:6px;margin-top:0;padding:4px 10px;font-size:0.8rem"
+          @click=${() => {
+            // Clearing the duration map together with the zone list keeps an
+            // empty selection from carrying stale per-zone runtimes back into
+            // the next save if the user selects a different set of zones.
+            this._zoneIds = [];
+            this._zoneDurations = {};
+            this.requestUpdate();
+          }}
+        >
+          ${t(this.hass, "config_panel.cycle_select_none")}
+        </button>
       </div>
       ${allIds.map((id) => {
         const checked = this._zoneIds.includes(id);
