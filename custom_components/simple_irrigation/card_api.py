@@ -45,6 +45,7 @@ from .program import soak_minutes
 from .water import planned_litres
 from .runtime import ScheduleSlotRunError, ZoneManualRunError
 from .time_util import parse_hh_mm, week_parity_matches
+from .validation import validate_mode_for_installation
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -200,7 +201,12 @@ def _slot_duration_min(inst: Installation, slot: ScheduleSlot) -> int:
                     zone.prerequisite.start_delay_sec
                     + zone.prerequisite.stop_delay_sec
                 )
-            durations.append(zone.duration_for_mode(inst.mode) + margins / 60)
+            watering = (
+                slot.zone_durations_min[zid]
+                if inst.mode == "schedule_specific" and zid in slot.zone_durations_min
+                else zone.duration_for_mode(inst.mode)
+            )
+            durations.append(watering + margins / 60)
         if durations:
             per_pass += max(durations)
     if per_pass == 0:
@@ -220,7 +226,12 @@ def _slot_water_l(inst: Installation, slot: ScheduleSlot) -> float | None:
     total = 0.0
     known = False
     for zid in _slot_zone_ids(inst, slot):
-        litres = planned_litres(inst.zones[zid], inst.zones[zid].duration_for_mode(inst.mode))
+        duration = (
+            slot.zone_durations_min[zid]
+            if inst.mode == "schedule_specific" and zid in slot.zone_durations_min
+            else inst.zones[zid].duration_for_mode(inst.mode)
+        )
+        litres = planned_litres(inst.zones[zid], duration)
         if litres is None:
             continue
         known = True
@@ -680,6 +691,9 @@ async def ws_action(
                 connection.send_error(
                     msg["id"], websocket_api.ERR_INVALID_FORMAT, "Unknown mode"
                 )
+                return
+            if error := validate_mode_for_installation(inst, mode):
+                connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, error)
                 return
             inst.mode = mode
             await coord.async_update_installation(inst)

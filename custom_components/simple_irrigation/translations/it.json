@@ -23,7 +23,8 @@
       "options": {
         "eco": "Eco",
         "normal": "Normale",
-        "extra": "Extra"
+        "extra": "Extra",
+        "schedule_specific": "Specifico per programma"
       }
     }
   },
@@ -34,7 +35,8 @@
         "state": {
           "eco": "Eco",
           "normal": "Normale",
-          "extra": "Extra"
+          "extra": "Extra",
+          "schedule_specific": "Specifico per programma"
         }
       }
     },
@@ -286,6 +288,8 @@
     "errors_invalid_zone_order": "L'elenco delle zone è cambiato durante il riordino. Aggiorna e riprova.",
     "errors_duplicate_start_time": "Ogni orario di avvio deve essere univoco.",
     "errors_too_many_start_times": "Questo ciclo contiene troppi orari di avvio.",
+    "errors_invalid_zone_duration": "Ogni durata pianificata deve essere compresa tra 0 e 240 minuti.",
+    "errors_schedule_durations_incomplete": "Aggiungi una durata per ogni zona di ogni programma attivo prima di selezionare la modalità specifica per programma.",
     "errors_not_running": "Nessun processo è in esecuzione al momento.",
     "errors_busy": "L’irrigazione è già in esecuzione.",
     "entity_placeholder_example": "Cerca per nome o ID entità",
@@ -347,6 +351,8 @@
     "general_mode_eco": "Eco",
     "general_mode_normal": "Normale",
     "general_mode_extra": "Extra",
+    "general_mode_schedule_specific": "Specifico per programma",
+    "general_mode_schedule_specific_hint": "Le esecuzioni pianificate usano la durata salvata per ogni zona. Avvia zona ora usa la durata normale.",
     "general_max_parallel": "Zone massime in parallelo",
     "general_max_parallel_desc": "Quante zone possono irrigare contemporaneamente. Le zone esclusive funzionano sempre da sole.",
     "general_max_parallel_field": "Zone massime in parallelo",
