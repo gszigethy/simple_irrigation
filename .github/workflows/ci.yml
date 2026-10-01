@@ -31,7 +31,7 @@ jobs:
       - name: Build panel frontend
         run: |
           cd custom_components/simple_irrigation/frontend
-          npm ci
+          npm ci --ignore-scripts
           npm run build
       - name: Pytest
         run: pytest tests/ --cov=custom_components/simple_irrigation --cov-report=term-missing --cov-report=xml

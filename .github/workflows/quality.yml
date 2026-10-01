@@ -23,11 +23,12 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install analysis tools
-        run: python -m pip install 'ruff==0.12.12' 'mypy==1.17.1'
+        run: |
+          python -m pip install --require-hashes --only-binary :all: -r .github/ci/requirements.txt
       - name: Python syntax
         run: python -m compileall -q custom_components
       - name: Block new Python defects
-        run: python .github/ci/lint_baseline.py ruff ruff check --select E9,F63,F7,F82 --output-format json custom_components
+        run: python .github/ci/lint_baseline.py ruff ruff check --isolated --no-respect-gitignore --select E9,F63,F7,F82 --output-format json custom_components
       - name: Python type diagnostics (initial baseline report)
         continue-on-error: true
         run: mypy --ignore-missing-imports --follow-imports skip custom_components
@@ -35,14 +36,14 @@ jobs:
         with:
           node-version: '24'
       - name: Install frontend lint tools
-        run: npm install --prefix /tmp/irrigation-tools --ignore-scripts --no-audit --no-fund eslint@10.11.0 @typescript-eslint/parser@8.71.0
+        run: npm ci --prefix .github/ci/node-tools --ignore-scripts --no-audit --no-fund
       - name: Block new frontend lint defects
-        run: python .github/ci/lint_baseline.py eslint /tmp/irrigation-tools/node_modules/.bin/eslint --config "$PWD/.github/ci/frontend-eslint.config.mjs" --format json custom_components/simple_irrigation/frontend/src
+        run: python .github/ci/lint_baseline.py eslint "$PWD/.github/ci/node-tools/node_modules/.bin/eslint" --config "$PWD/.github/ci/frontend-eslint.config.mjs" --format json custom_components/simple_irrigation/frontend/src
       - name: Frontend typecheck (initial baseline report)
         continue-on-error: true
         working-directory: custom_components/simple_irrigation/frontend
         run: |
-          npm ci
+          npm ci --ignore-scripts
           npx --no-install tsc --noEmit
       - name: ShellCheck
         run: |

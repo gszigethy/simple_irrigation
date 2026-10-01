@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 
-const require = createRequire("/tmp/irrigation-tools/package.json");
+const require = createRequire(new URL("./node-tools/package.json", import.meta.url));
 const parser = require("@typescript-eslint/parser");
 
 export default [{
