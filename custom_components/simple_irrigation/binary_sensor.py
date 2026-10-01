@@ -6,7 +6,7 @@ from typing import Any
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
@@ -31,6 +31,21 @@ async def async_setup_entry(
     for zid, zone in coordinator.installation.zones.items():
         entities.append(ZoneActiveBinarySensor(coordinator, zid, zone.name))
     async_add_entities(entities)
+
+    known = set(coordinator.installation.zones)
+
+    @callback
+    def _sync_zone_sensors() -> None:
+        new_entities: list[BinarySensorEntity] = []
+        for zid, zone in coordinator.installation.zones.items():
+            if zid in known:
+                continue
+            known.add(zid)
+            new_entities.append(ZoneActiveBinarySensor(coordinator, zid, zone.name))
+        if new_entities:
+            async_add_entities(new_entities)
+
+    entry.async_on_unload(coordinator.async_add_listener(_sync_zone_sensors))
 
 
 class RunningBinarySensor(SimpleIrrigationEntity, BinarySensorEntity):
@@ -121,6 +136,11 @@ class ZoneActiveBinarySensor(SimpleIrrigationEntity, BinarySensorEntity):
         self._zone_id = zone_id
         self._attr_translation_key = "zone_active"
         self._attr_translation_placeholders = {"zone_name": zone_name}
+
+    @property
+    def available(self) -> bool:
+        """A deleted zone's old entity must not report a misleading state."""
+        return super().available and self._zone_id in self.coordinator.installation.zones
 
     @property
     def is_on(self) -> bool | None:

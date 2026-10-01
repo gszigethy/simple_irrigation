@@ -6,7 +6,7 @@ from typing import Any
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
@@ -29,6 +29,21 @@ async def async_setup_entry(
     for zid, zone in coordinator.installation.zones.items():
         entities.append(ZoneRunButton(coordinator, runtime, zid, zone.name))
     async_add_entities(entities)
+
+    known = set(coordinator.installation.zones)
+
+    @callback
+    def _sync_zone_buttons() -> None:
+        new_entities: list[ButtonEntity] = []
+        for zid, zone in coordinator.installation.zones.items():
+            if zid in known:
+                continue
+            known.add(zid)
+            new_entities.append(ZoneRunButton(coordinator, runtime, zid, zone.name))
+        if new_entities:
+            async_add_entities(new_entities)
+
+    entry.async_on_unload(coordinator.async_add_listener(_sync_zone_buttons))
 
 
 class RunDueButton(SimpleIrrigationEntity, ButtonEntity):
@@ -77,6 +92,11 @@ class ZoneRunButton(SimpleIrrigationEntity, ButtonEntity):
         self._zone_id = zone_id
         self._attr_translation_key = "zone_run_now"
         self._attr_translation_placeholders = {"zone_name": zone_name}
+
+    @property
+    def available(self) -> bool:
+        """A deleted zone's old entity must not remain actionable."""
+        return super().available and self._zone_id in self.coordinator.installation.zones
 
     async def async_press(self) -> None:
         """Run zone."""

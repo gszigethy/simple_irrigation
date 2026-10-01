@@ -114,6 +114,34 @@ async def test_zone_starts_all_outputs_in_parallel_when_no_target_is_set() -> No
 
 
 @pytest.mark.asyncio
+async def test_failed_custom_start_keeps_all_outputs_tracked_for_cleanup() -> None:
+    """A partial controller start must leave its outputs in the safety cleanup set."""
+    calls: list[tuple[str, str, dict]] = []
+    zone = Zone(
+        zone_id="z1",
+        name="Front",
+        switch_entity_ids=["switch.front", "switch.back"],
+        start_service="rainbird.start_irrigation",
+        duration_field="duration",
+        duration_unit="minutes",
+    )
+    runtime = _runtime(calls, zone)
+
+    async def _call(domain, service, data=None, **_kwargs):
+        payload = dict(data or {})
+        calls.append((domain, service, payload))
+        if payload.get("entity_id") == "switch.back":
+            raise HomeAssistantError("controller rejected back zone")
+
+    runtime.hass.services.async_call = AsyncMock(side_effect=_call)
+
+    with pytest.raises(HomeAssistantError, match="controller rejected back zone"):
+        await runtime._async_zone_run_with_duration_service(zone, duration_min=7)
+
+    assert runtime._touched_entities == {"switch.front", "switch.back"}
+
+
+@pytest.mark.asyncio
 async def test_zone_falls_back_to_default_start_on_unknown_duration_unit() -> None:
     calls: list[tuple[str, str, dict]] = []
     zone = Zone(
@@ -217,6 +245,28 @@ async def test_cleanup_closes_every_output_even_when_one_fails() -> None:
     assert turned_off == {"switch.broken", "switch.front", "switch.pump"}
     assert runtime._touched_entities == set()
     assert "switch.broken" in runtime.coordinator.run_state.last_error
+
+
+@pytest.mark.asyncio
+async def test_stop_all_keeps_cleanup_failure_visible() -> None:
+    """Stop must end in ERROR when an output cannot be closed."""
+    calls: list[tuple[str, str, dict]] = []
+    zone = Zone(zone_id="z1", name="Front", switch_entity_ids=["switch.front"])
+    runtime = _runtime(calls, zone)
+
+    async def _call(domain, service, data=None, **_kwargs):
+        payload = dict(data or {})
+        calls.append((domain, service, payload))
+        if payload.get("entity_id") == "switch.front":
+            raise HomeAssistantError("valve unavailable")
+
+    runtime.hass.services.async_call = AsyncMock(side_effect=_call)
+    runtime._touched_entities.add("switch.front")
+
+    await runtime.async_stop_all()
+
+    assert runtime.coordinator.run_state.run_state == "error"
+    assert "switch.front" in runtime.coordinator.run_state.last_error
 
 
 @pytest.mark.asyncio
