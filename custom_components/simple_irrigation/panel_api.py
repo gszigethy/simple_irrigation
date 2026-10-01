@@ -540,7 +540,7 @@ class SimpleIrrigationPanelZoneView(HomeAssistantView):
             await coord.async_update_installation(inst)
             return self.json({"success": True, "zone_id": zid})
 
-        zid = data.get("zone_id")
+        zid = str(data.get("zone_id") or "")
         if not zid or zid not in inst.zones:
             return self.json({"success": False, "error": "unknown_zone"}, status_code=400)
 
@@ -700,7 +700,7 @@ class SimpleIrrigationPanelSlotView(HomeAssistantView):
                 guards, guard_err = parse_guard_list(hass, data["guards"])
                 if guard_err:
                     return self.json({"success": False, "error": guard_err}, status_code=400)
-            slot = ScheduleSlot(
+            new_slot = ScheduleSlot(
                 slot_id=str(uuid.uuid4()),
                 weekdays=weekdays,
                 time_local=str(t).strip(),
@@ -710,13 +710,13 @@ class SimpleIrrigationPanelSlotView(HomeAssistantView):
                 guards=guards,
                 ignore_global_guards=bool(data.get("ignore_global_guards", False)),
             )
-            script_err = _apply_slot_script_overrides(hass, slot, data)
+            script_err = _apply_slot_script_overrides(hass, new_slot, data)
             if script_err:
                 return self.json({"success": False, "error": script_err}, status_code=400)
-            _apply_slot_cycle_soak(slot, data)
-            inst.schedule_slots.append(slot)
+            _apply_slot_cycle_soak(new_slot, data)
+            inst.schedule_slots.append(new_slot)
             await coord.async_update_installation(inst)
-            return self.json({"success": True, "slot_id": slot.slot_id})
+            return self.json({"success": True, "slot_id": new_slot.slot_id})
 
         if action == "cycle_upsert":
             kind = str(data.get("cycle_kind") or "custom")

@@ -98,7 +98,7 @@ def parse_guard_list(hass: Any, raw: Any) -> tuple[list[Guard], str | None]:
         if operator in GUARD_BOOLEAN_OPERATORS:
             value = None
         elif operator in GUARD_NUMERIC_OPERATORS:
-            if rawval in (None, ""):
+            if rawval is None or rawval == "":
                 return [], "missing_guard_value"
             try:
                 value = float(rawval)

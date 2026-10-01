@@ -57,6 +57,11 @@ def _copy_steps(steps: list[RunStep]) -> list[RunStep]:
     return [step if isinstance(step, Soak) else list(step) for step in steps]
 
 
+def _steps_from_phases(phases: list[list[str]]) -> list[RunStep]:
+    """Copy watering phases into the wider run-step representation."""
+    return [list(phase) for phase in phases]
+
+
 class ZoneManualRunError(HomeAssistantError):
     """Manual zone run cannot start; ``code`` is used by the panel HTTP API."""
 
@@ -620,14 +625,12 @@ class IrrigationRuntime:
                 for zid in self._drain_mid_phase_extensions():
                     _launch(zid)
 
-            for t in done:
-                if t is ext_wait:
-                    continue
-                zid = next((z for z, ut in tasks_by_zone.items() if ut is t), None)
-                if zid is None:
-                    continue
-                tasks_by_zone.pop(zid, None)
-                await t
+            completed_zone_ids = [
+                zid for zid, task in tasks_by_zone.items() if task in done
+            ]
+            for zid in completed_zone_ids:
+                task = tasks_by_zone.pop(zid)
+                await task
 
             await _sync_active()
 
@@ -864,12 +867,14 @@ class IrrigationRuntime:
                 self._zone_stop_requests.discard(zone_id)
                 if rs.run_state == RUN_STATE_PREPARING:
                     self._manual_zone_order.append(zone_id)
-                    self._phase_queue = compute_phases(
-                        self._manual_zone_order,
-                        inst.zones,
-                        inst.max_parallel_zones,
+                    self._phase_queue = _steps_from_phases(
+                        compute_phases(
+                            self._manual_zone_order,
+                            inst.zones,
+                            inst.max_parallel_zones,
+                        )
                     )
-                    rs.upcoming_phases = [list(g) for g in self._phase_queue]
+                    rs.upcoming_phases = watering_steps(self._phase_queue)
                     await self.coordinator.async_update_run_state(rs)
                     return
                 if rs.run_state == RUN_STATE_RUNNING:
@@ -889,7 +894,7 @@ class IrrigationRuntime:
                             inst.zones,
                             inst.max_parallel_zones,
                         )
-                        rs.upcoming_phases = [list(g) for g in self._phase_queue] + [
+                        rs.upcoming_phases = watering_steps(self._phase_queue) + [
                             list(g) for g in tail
                         ]
                         await self.coordinator.async_update_run_state(rs)
@@ -899,10 +904,12 @@ class IrrigationRuntime:
             overrides = {zone_id: dur}
             self._duration_overrides = overrides
             self._manual_zone_order = [zone_id]
-            self._phase_queue = compute_phases(
-                self._manual_zone_order,
-                inst.zones,
-                inst.max_parallel_zones,
+            self._phase_queue = _steps_from_phases(
+                compute_phases(
+                    self._manual_zone_order,
+                    inst.zones,
+                    inst.max_parallel_zones,
+                )
             )
             self._after_phase_zone_order.clear()
             self._mid_phase_extensions.clear()

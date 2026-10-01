@@ -33,7 +33,9 @@ def _output_entity_selector(multiple: bool) -> EntitySelector:
     )
 
 
-class SimpleIrrigationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+# Home Assistant consumes ``domain`` in ConfigFlow.__init_subclass__ at runtime.
+# Its type cannot be resolved when mypy deliberately skips Home Assistant imports.
+class SimpleIrrigationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     """First-time config flow."""
 
     VERSION = 1

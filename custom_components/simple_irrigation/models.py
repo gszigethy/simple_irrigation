@@ -63,7 +63,7 @@ class Guard:
         if operator in GUARD_BOOLEAN_OPERATORS:
             value = None
         elif operator in GUARD_NUMERIC_OPERATORS:
-            if raw in (None, ""):
+            if raw is None or raw == "":
                 return None
             try:
                 value = float(raw)
