@@ -220,6 +220,7 @@ class IrrigationRuntime:
             rs.current_run_started_at = dt_util.utcnow()
             rs.run_water_l = None
             rs.run_water_source = ""
+            rs.last_error = None
             self._run_meter_start = meter_litres(self.hass, inst.water_meter_entity_id)
             # active_zone_ids empty until first phase; upcoming = phases not yet started.
             rs.upcoming_phases = watering_steps(self._phase_queue)
@@ -312,7 +313,7 @@ class IrrigationRuntime:
         self._book_run_water()
         await self._async_post_run()
 
-        rs.run_state = state
+        final_state = state
         rs.active_zone_ids = []
         rs.queued_zone_ids = []
         rs.current_slot_id = None
@@ -326,8 +327,13 @@ class IrrigationRuntime:
         rs.soak_until = None
         if error:
             rs.last_error = error
+        elif rs.last_error:
+            # Cleanup records outputs it could not close. Do not present a
+            # successful idle state while hardware may still be energized.
+            final_state = RUN_STATE_ERROR
         elif state == RUN_STATE_IDLE:
             rs.last_error = None
+        rs.run_state = final_state
         await self.coordinator.async_update_run_state(rs)
 
         self.hass.bus.async_fire(
@@ -1011,8 +1017,11 @@ class IrrigationRuntime:
         explicit_target = zone.start_entity_id.strip()
         targets = [explicit_target] if explicit_target else outputs
 
-        await asyncio.gather(*(_start_target(eid) for eid in targets))
+        # A controller can accept one target and reject another. Track every
+        # output before the calls so pipeline cleanup still closes any valve
+        # that did start when gather() raises.
         self._touched_entities.update(outputs)
+        await asyncio.gather(*(_start_target(eid) for eid in targets))
         await self._async_wait_zone_duration(duration_min * 60, zone.zone_id)
         await asyncio.gather(*(self._async_switch_turn_off(eid) for eid in outputs))
         return True
@@ -1240,6 +1249,9 @@ class IrrigationRuntime:
         """Signal stop and turn off outputs."""
         self._stop_event.set()
         self._zone_stop_requests.clear()
+        # A new stop attempt replaces an older error, but cleanup below may set
+        # a new one when an output refuses to close.
+        self.coordinator.run_state.last_error = None
         if self._task and not self._task.done():
             try:
                 await asyncio.wait_for(self._task, timeout=300)
@@ -1247,9 +1259,11 @@ class IrrigationRuntime:
                 self._task.cancel()
         await self._async_turn_off_all_tracked()
         rs = self.coordinator.run_state
-        rs.run_state = RUN_STATE_IDLE
+        rs.run_state = RUN_STATE_ERROR if rs.last_error else RUN_STATE_IDLE
         rs.active_zone_ids = []
-        rs.last_error = None
+        rs.queued_zone_ids = []
+        rs.current_slot_id = None
+        rs.manual_run = False
         rs.upcoming_phases = []
         rs.phase_index = 0
         rs.active_script = None

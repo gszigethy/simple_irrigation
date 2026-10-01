@@ -11,7 +11,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfVolume
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN, RUN_STATE_RUNNING
@@ -40,6 +40,28 @@ async def async_setup_entry(
         entities.append(ZoneEndsAtSensor(coordinator, zid, zone.name))
         entities.append(ZoneWaterSensor(coordinator, zid, zone.name))
     async_add_entities(entities)
+
+    known = set(coordinator.installation.zones)
+
+    @callback
+    def _sync_zone_sensors() -> None:
+        new_entities: list[SensorEntity] = []
+        for zid, zone in coordinator.installation.zones.items():
+            if zid in known:
+                continue
+            known.add(zid)
+            new_entities.extend(
+                [
+                    ZoneNextRunSensor(coordinator, zid, zone.name),
+                    ZoneLastRunSensor(coordinator, zid, zone.name),
+                    ZoneEndsAtSensor(coordinator, zid, zone.name),
+                    ZoneWaterSensor(coordinator, zid, zone.name),
+                ]
+            )
+        if new_entities:
+            async_add_entities(new_entities)
+
+    entry.async_on_unload(coordinator.async_add_listener(_sync_zone_sensors))
 
 
 class WaterSensor(SimpleIrrigationEntity, SensorEntity):
@@ -105,6 +127,11 @@ class ZoneWaterSensor(SimpleIrrigationEntity, SensorEntity):
         self._zone_id = zone_id
         self._attr_translation_key = "zone_water"
         self._attr_translation_placeholders = {"zone_name": zone_name}
+
+    @property
+    def available(self) -> bool:
+        """A deleted zone's historical sensor remains visible but unavailable."""
+        return super().available and self._zone_id in self.coordinator.installation.zones
 
     @property
     def native_value(self) -> float | None:
@@ -225,6 +252,11 @@ class ZoneNextRunSensor(SimpleIrrigationEntity, SensorEntity):
         self._attr_translation_placeholders = {"zone_name": zone_name}
 
     @property
+    def available(self) -> bool:
+        """A deleted zone's historical sensor remains visible but unavailable."""
+        return super().available and self._zone_id in self.coordinator.installation.zones
+
+    @property
     def native_value(self):
         """Next run for zone."""
         return self.coordinator.run_state.next_run_per_zone.get(self._zone_id)
@@ -247,6 +279,11 @@ class ZoneLastRunSensor(SimpleIrrigationEntity, SensorEntity):
         self._zone_id = zone_id
         self._attr_translation_key = "zone_last_run"
         self._attr_translation_placeholders = {"zone_name": zone_name}
+
+    @property
+    def available(self) -> bool:
+        """A deleted zone's historical sensor remains visible but unavailable."""
+        return super().available and self._zone_id in self.coordinator.installation.zones
 
     @property
     def native_value(self):
@@ -275,6 +312,11 @@ class ZoneEndsAtSensor(SimpleIrrigationEntity, SensorEntity):
         self._zone_id = zone_id
         self._attr_translation_key = "zone_ends_at"
         self._attr_translation_placeholders = {"zone_name": zone_name}
+
+    @property
+    def available(self) -> bool:
+        """A deleted zone's historical sensor remains visible but unavailable."""
+        return super().available and self._zone_id in self.coordinator.installation.zones
 
     @property
     def native_value(self):
